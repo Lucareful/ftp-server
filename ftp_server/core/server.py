@@ -4,6 +4,7 @@
 @time:2020/6/2 19:03
 """
 import json
+import configparser
 import socketserver
 
 
@@ -31,7 +32,11 @@ class ServerHandler(socketserver.BaseRequestHandler):
                 print("Invalid cmd")
 
     def auth(self, **data):
-        pass
+        # {'action': 'auth', 'username': 'luenci', 'password': '123'}
+        username = data['username']
+        password = data['password']
+        config = configparser.ConfigParser()
+        config.read('UserDataBase.cfg')
 
     def put(self, **data):
         pass
