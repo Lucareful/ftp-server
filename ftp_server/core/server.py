@@ -5,8 +5,28 @@
 """
 import json
 import configparser
+import os
 import socketserver
+from conf import settings
 
+
+STATUS_CODE = {
+    250:"Invalid cmd format",
+    251:"Invalid cmd",
+    252:"Invalid auth data",
+    253:"Wrong username or password",
+    254:"Passed authentication",
+    255:"Filename doesn't provided",
+    256:"File doesn't exits on server",
+    257:"ready to send file",
+    258:"md5 verification",
+
+    800:"the file exits, but not enough, is continue?",
+    801:"the file exit !",
+    802:"ready to receive datas",
+
+    900:"md5 verify success !"
+}
 
 class ServerHandler(socketserver.BaseRequestHandler):
     def handle(self):
@@ -31,12 +51,58 @@ class ServerHandler(socketserver.BaseRequestHandler):
             else:
                 print("Invalid cmd")
 
+    def send_response(self, status_code):
+        response = {"status_code":status_code}
+
+        self.request.sendall(json.dumps(response).encode('utf-8'))
+
     def auth(self, **data):
         # {'action': 'auth', 'username': 'luenci', 'password': '123'}
         username = data['username']
         password = data['password']
+
+        usr = self.authenticate(username,password)
+        if usr:
+            self.send_response(254)
+
+        else:
+            self.send_response(253)
+
+    def authenticate(self,user,pwd):
         config = configparser.ConfigParser()
-        config.read('UserDataBase.cfg')
+        config.read(settings.USER_INFO)
+
+        if user in config.sections():
+            if config[user]['password'] == pwd:
+                self.user = user
+                self.main_path = os.path.join(settings.BASE_DIR, "home", self.user)
+                return user
+
 
     def put(self, **data):
-        pass
+        print("data:",data)
+        file_name = data.get("file_name")
+        file_size = data.get("file_size")
+        target_path = data.get("target_path")
+
+        abs_path = os.path.join(self.main_path, target_path,file_name)
+        has_received = 0
+        if os.path.exists(abs_path):
+            file_has_size = os.stat(abs_path).st_size
+            if file_has_size < file_size:
+                # 断点续传
+                self.request.sendall("800".encode("utf-8"))
+            else:
+                # 文件完整存在
+                self.request.sendall('801'.encode("utf-8"))
+                return
+        else:
+            self.request.sendall("802".encode("utf-8"))
+            f = open(abs_path,"wb")
+        while has_received < file_size:
+            data = self.request.recv(1024)
+            f.write(data)
+            has_received += len(data)
+        f.close()
+
+
