@@ -13,9 +13,9 @@ class ArgvHandler(object):
     def __init__(self):
         self.op = optparse.OptionParser()
         options, args = self.op.parse_args()
-        self.verify_args(options,args)
+        self.verify_args(options, args)
 
-    def verify_args(self,options,args):
+    def verify_args(self, options, args):
         cmd = args[0]
         if hasattr(self, cmd):
             func = getattr(self, cmd)

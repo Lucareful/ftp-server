@@ -52,7 +52,7 @@ class ClientHandler(object):
         if 0 < int(port) < 65535:
             return True
         else:
-            print("端口范围有误...")
+            exit("端口范围有误...")
 
     def make_connection(self):
         self.sock = socket.socket()
@@ -60,20 +60,21 @@ class ClientHandler(object):
 
     def interactive(self):
         print("server is begin......")
-        while self.authenticate():
-            cmd_info = input("[%s]" % self.user).strip()
-            cmd_list = cmd_info.split()
-            if hasattr(self, cmd_list[0]):
-                func = getattr(self, cmd_list[0])
-                func(*cmd_list)
+        if self.authenticate():
+            while True:
+                cmd_info = input("[%s]" % self.current_dir).strip()
+                cmd_list = cmd_info.split()
+                if hasattr(self, cmd_list[0]):
+                    func = getattr(self, cmd_list[0])
+                    func(*cmd_list)
 
     def authenticate(self):
         if self.options.username is None or self.options.password is None:
             username = input("username: ")
             password = input("password: ")
             return self.get_auth_result(username, password)
-        else:
-            return self.get_auth_result(self.options.username, self.options.password)
+
+        return self.get_auth_result(self.options.username, self.options.password)
 
     def response(self):
         data = self.sock.recv(1024).decode("utf-8")
@@ -92,6 +93,7 @@ class ClientHandler(object):
         # print(STATUS_CODE[response["status_code"]])
         if response["status_code"] == 254:
             self.user = user
+            self.current_dir = user
             print(STATUS_CODE[254])
             return True
         else:
@@ -137,13 +139,41 @@ class ClientHandler(object):
             data = f.read(1024)
             self.sock.sendall(data)
             has_send += len(data)
-            self.show_progress(has_send,file_size)
+            self.show_progress(has_send, file_size)
         print("上传成功")
 
     def show_progress(self, has, total):
-        rate = float(has)/float(total)
+        rate = float(has) / float(total)
         rate_num = int(rate * 100)
-        sys.stdout.write("%s%% %s\r" %(rate_num, '#'*rate_num))
+        sys.stdout.write("%s%% %s\r" % (rate_num, '#' * rate_num))
+
+    def ls(self, *cmd_list):
+        data = {
+            "action": "ls",
+        }
+        self.sock.sendall(json.dumps(data).encode("utf-8"))
+        data = self.sock.recv(1024).decode("utf-8")
+        print(data)
+
+    def cd(self, *cmd_list):
+        data = {
+            "action": "cd",
+            "dirname": cmd_list[1],
+        }
+        self.sock.sendall(json.dumps(data).encode("utf-8"))
+
+        data = self.sock.recv(1024).decode("utf-8")
+        print(os.path.basename(data))
+        self.current_dir = os.path.basename(data)
+
+    def mkdir(self, *cmd_list):
+        data = {
+            "action":"mkdir",
+            "dirname":cmd_list[1]
+        }
+        self.sock.sendall(json.dumps(data).encode("utf-8"))
+        data = self.sock.recv(1024).decode("utf-8")
+        print(data)
 
 
 ch = ClientHandler()

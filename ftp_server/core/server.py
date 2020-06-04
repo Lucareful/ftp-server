@@ -75,7 +75,8 @@ class ServerHandler(socketserver.BaseRequestHandler):
         if user in config.sections():
             if config[user]['password'] == pwd:
                 self.user = user
-                self.main_path = os.path.join(settings.BASE_DIR, "home")
+                self.main_path = os.path.join(settings.BASE_DIR, "home", self.user)
+                print("Passed authentication")
                 return user
 
     def put(self, **data):
@@ -115,3 +116,38 @@ class ServerHandler(socketserver.BaseRequestHandler):
             has_received += len(data)
 
         f.close()
+
+    def ls(self, **data):
+
+        file_list = os.listdir(self.main_path)
+        file_str = "\n".join(file_list)
+        if not len(file_list):
+            file_str = "<empty dir>"
+
+        self.request.sendall(file_str.encode("utf-8"))
+
+    def cd(self, **data):
+        dirname = data.get("dirname")
+
+        if dirname == "..":
+            self.main_path = os.path.dirname(self.main_path)
+        else:
+            self.main_path = os.path.join(self.main_path, dirname)
+
+        self.request.sendall(self.main_path.encode("utf-8"))
+
+    def mkdir(self, **data):
+        dirname = data.get("dirname")
+
+        path = os.path.join(self.main_path,dirname)
+
+        if not os.path.exists(path):
+            if "/" in dirname:
+                os.makedirs(path)
+                self.request.sendall("Create Success!".encode("utf-8"))
+            else:
+                os.mkdir(path)
+                self.request.sendall("Create Success!".encode("utf-8"))
+        else:
+            self.request.sendall("dirname exist!".encode("utf-8"))
+
